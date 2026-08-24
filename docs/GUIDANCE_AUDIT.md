@@ -27,5 +27,6 @@ and allowed a reasonable opportunity to correct it.
 - [Appendix Student](https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-student)
 - [Appendix Finance](https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-finance)
 
-The committed graph remains `REQUIRES_HUMAN_REVIEW`; this audit does not
-replace line-by-line legal review of that graph.
+The committed cash-evidence graph was reviewed against these primary sources
+on 24 August 2026. This guidance audit does not replace checking the live rules
+when using the tool later.

@@ -12,6 +12,7 @@ from pathlib import Path
 
 from engine.gaps import CaseFacts, assess
 from rulebook.graph import load_graph
+from storage import CaseStore
 
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -23,8 +24,7 @@ def _date(value: str | None) -> date | None:
     return date.fromisoformat(value) if value else None
 
 
-def load_case(path: Path = CASE_PATH) -> CaseFacts:
-    raw = json.loads(path.read_text(encoding="utf-8"))
+def facts_from_raw(raw: dict) -> CaseFacts:
     return CaseFacts(
         study_in_london=raw.get("study_in_london"),
         course_months=raw.get("course_months"),
@@ -36,6 +36,11 @@ def load_case(path: Path = CASE_PATH) -> CaseFacts:
         months_in_uk_with_permission=raw.get("months_in_uk_with_permission"),
         applying_permission_to_stay=raw.get("applying_permission_to_stay", False),
     )
+
+
+def load_case(path: Path | None = None) -> CaseFacts:
+    raw = json.loads(path.read_text(encoding="utf-8")) if path else CaseStore().load("case")
+    return facts_from_raw(raw)
 
 
 def briefing_for(facts: CaseFacts, as_of: date | None = None) -> dict:
@@ -63,13 +68,16 @@ def briefing_for(facts: CaseFacts, as_of: date | None = None) -> dict:
     }
 
 
-def run(case_path: Path = CASE_PATH, briefing_path: Path = BRIEFING_PATH, as_of: date | None = None) -> dict:
+def run(case_path: Path | None = None, briefing_path: Path | None = None, as_of: date | None = None) -> dict:
     """Recompute and atomically replace the latest briefing for one local case."""
     briefing = briefing_for(load_case(case_path), as_of)
-    briefing_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = briefing_path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(briefing, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(briefing_path)
+    if briefing_path:
+        briefing_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = briefing_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(briefing, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(briefing_path)
+    else:
+        CaseStore().save("morning_briefing", briefing)
     return briefing
 
 

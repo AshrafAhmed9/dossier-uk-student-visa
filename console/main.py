@@ -11,18 +11,19 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from agents.interviewer import choose_next_question
 from agents.notebook import NoteKind, Notebook
 from engine.gaps import CaseFacts, assess
-from jobs.nightly import CASE_PATH, DATA_DIR, briefing_for, load_case
+from jobs.nightly import briefing_for, facts_from_raw, load_case, run
 from rulebook.graph import load_graph
+from storage import CaseStore
 
 
 app = FastAPI(title="Dossier")
-PREFERENCE_PATH = DATA_DIR / "preferences.json"
+store = CaseStore()
 
 
 def _case_dict(facts: CaseFacts) -> dict[str, Any]:
@@ -41,13 +42,11 @@ def _case_dict(facts: CaseFacts) -> dict[str, Any]:
 
 
 def _load_facts() -> CaseFacts:
-    return load_case() if CASE_PATH.exists() else CaseFacts()
+    return facts_from_raw(store.load("case"))
 
 
 def _question_style() -> str:
-    if not PREFERENCE_PATH.exists():
-        return "clear and direct"
-    return json.loads(PREFERENCE_PATH.read_text(encoding="utf-8")).get("question_style", "clear and direct")
+    return store.load("preferences").get("question_style", "clear and direct")
 
 
 def _integer_or_none(value: str, label: str) -> int | None:
@@ -125,17 +124,31 @@ def save_case(
         "study_in_london": {"true": True, "false": False}.get(study_in_london),
         "applying_permission_to_stay": applying_permission_to_stay,
     }
-    CASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CASE_PATH.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    store.save("case", raw)
     return RedirectResponse("/dossier", status_code=303)
 
 
 @app.post("/preference")
 def save_preference(question_style: str = Form("clear and direct")) -> RedirectResponse:
     # Preferences are intentionally not mixed into CaseFacts or the legal engine.
-    PREFERENCE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PREFERENCE_PATH.write_text(json.dumps({"question_style": question_style}) + "\n", encoding="utf-8")
+    store.save("preferences", {"question_style": question_style})
     return RedirectResponse("/", status_code=303)
+
+
+@app.post("/internal/nightly")
+def scheduled_nightly(request: Request) -> JSONResponse:
+    """Cloud Scheduler invokes this with an OIDC token; local calls stay simple."""
+    if __import__("os").environ.get("K_SERVICE"):
+        from google.auth.transport import requests
+        from google.oauth2 import id_token
+        authorization = request.headers.get("authorization", "")
+        if not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Scheduler authentication is required.")
+        try:
+            id_token.verify_oauth2_token(authorization.removeprefix("Bearer "), requests.Request(), audience=request.base_url._url.rstrip("/"))
+        except ValueError as exc:
+            raise HTTPException(status_code=401, detail="Invalid scheduler identity.") from exc
+    return JSONResponse(run())
 
 
 @app.get("/dossier", response_class=HTMLResponse)

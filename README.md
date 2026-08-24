@@ -12,7 +12,7 @@ It is not legal advice and does not submit an application or make an immigration
 - A structured interview and correction-ready case notebook.
 - Boundary tests for the financial rules and a guard that keeps the decision engine independent of agent code.
 
-The rule graph is marked `REQUIRES_HUMAN_REVIEW`: sources and values must be checked against the official rules before relying on an assessment.
+The committed cash-evidence graph was reviewed against the live official pages on 24 August 2026. Immigration rules can change, so confirm the cited sources before relying on an assessment.
 
 This version does not assess the distinct student-loan or official-sponsorship routes.
 
