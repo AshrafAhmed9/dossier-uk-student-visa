@@ -24,6 +24,7 @@ class CaseFacts:
     study_in_london: bool | None = None
     course_months: int | None = None
     outstanding_course_fees_gbp: int | None = None
+    sponsor_accommodation_paid_gbp: int | None = None
     bank_balance_gbp: int | None = None
     funds_held_since: date | None = None
     evidence_closing_date: date | None = None
@@ -73,7 +74,8 @@ def required_funds(facts: CaseFacts) -> int | None:
     if None in (facts.study_in_london, facts.course_months, facts.outstanding_course_fees_gbp):
         return None
     monthly = LONDON_MONTHLY if facts.study_in_london else OUTSIDE_LONDON_MONTHLY
-    return facts.outstanding_course_fees_gbp + monthly * min(facts.course_months, 9)
+    accommodation_credit = min(facts.sponsor_accommodation_paid_gbp or 0, 1529)
+    return facts.outstanding_course_fees_gbp + monthly * min(facts.course_months, 9) - accommodation_credit
 
 
 def assess(graph: RequirementGraph, facts: CaseFacts, as_of: date | None = None) -> Assessment:
@@ -81,7 +83,7 @@ def assess(graph: RequirementGraph, facts: CaseFacts, as_of: date | None = None)
     as_of = as_of or date.today()
     exempt = facts.applying_permission_to_stay and (facts.months_in_uk_with_permission or 0) >= 12
     if exempt:
-        node_ids = ("st_12_1_exemption", "st_12_3_london", "st_12_3_outside_london", "st_12_6_holding_period", "fin_7_1_recency", "fin_7_2_count_back")
+        node_ids = ("st_12_1_exemption", "st_12_3_london", "st_12_3_outside_london", "st_12_4_accommodation", "st_12_6_holding_period", "fin_7_1_recency", "fin_7_2_count_back")
         return Assessment(None, tuple(
             _assessment(graph, node_id, Status.SATISFIED if node_id == "st_12_1_exemption" else Status.NOT_APPLICABLE,
                         "12+ months of UK permission for a permission-to-stay application; financial evidence is not required." if node_id == "st_12_1_exemption" else "Pruned because ST 12.1 is met.")
@@ -100,6 +102,14 @@ def assess(graph: RequirementGraph, facts: CaseFacts, as_of: date | None = None)
         nodes.append(_assessment(graph, location_node, Status.SATISFIED, f"Balance £{facts.bank_balance_gbp:,} meets calculated requirement £{total:,}."))
     else:
         nodes.append(_assessment(graph, location_node, Status.UNSATISFIED, f"Balance £{facts.bank_balance_gbp:,} is £{total - facts.bank_balance_gbp:,} below calculated requirement £{total:,}."))
+    accommodation = facts.sponsor_accommodation_paid_gbp or 0
+    accommodation_status = Status.SATISFIED if accommodation <= 1529 else Status.UNSATISFIED
+    nodes.append(_assessment(
+        graph, "st_12_4_accommodation", accommodation_status,
+        "No accommodation offset claimed." if accommodation == 0 else
+        f"£{min(accommodation, 1529):,} accommodation offset included (ST 12.4 caps this at £1,529)." if accommodation_status == Status.SATISFIED else
+        "The stated accommodation payment exceeds the £1,529 cap; only £1,529 may be offset."
+    ))
 
     earliest = None
     latest = facts.evidence_closing_date + timedelta(days=EVIDENCE_RECENCY_DAYS) if facts.evidence_closing_date else None

@@ -27,6 +27,11 @@ def test_current_amounts_and_london_split():
     assert required_funds(facts(study_in_london=True)) == 18_761
 
 
+def test_sponsor_accommodation_offset_is_capped_at_st_12_4_limit():
+    assert required_funds(facts(sponsor_accommodation_paid_gbp=1_000)) == 14_539
+    assert required_funds(facts(sponsor_accommodation_paid_gbp=2_000)) == 14_010
+
+
 def test_holding_period_boundaries_are_inclusive():
     assert node(assess(GRAPH, facts(funds_held_since=TODAY - timedelta(days=26)), TODAY), "st_12_6_holding_period").status == Status.BLOCKED
     assert node(assess(GRAPH, facts(funds_held_since=TODAY - timedelta(days=27)), TODAY), "st_12_6_holding_period").status == Status.SATISFIED

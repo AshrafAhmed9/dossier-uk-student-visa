@@ -29,6 +29,7 @@ def load_case(path: Path = CASE_PATH) -> CaseFacts:
         study_in_london=raw.get("study_in_london"),
         course_months=raw.get("course_months"),
         outstanding_course_fees_gbp=raw.get("outstanding_course_fees_gbp"),
+        sponsor_accommodation_paid_gbp=raw.get("sponsor_accommodation_paid_gbp"),
         bank_balance_gbp=raw.get("bank_balance_gbp"),
         funds_held_since=_date(raw.get("funds_held_since")),
         evidence_closing_date=_date(raw.get("evidence_closing_date")),

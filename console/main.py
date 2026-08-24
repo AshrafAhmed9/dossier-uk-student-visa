@@ -30,6 +30,7 @@ def _case_dict(facts: CaseFacts) -> dict[str, Any]:
         "study_in_london": facts.study_in_london,
         "course_months": facts.course_months,
         "outstanding_course_fees_gbp": facts.outstanding_course_fees_gbp,
+        "sponsor_accommodation_paid_gbp": facts.sponsor_accommodation_paid_gbp,
         "bank_balance_gbp": facts.bank_balance_gbp,
         "funds_held_since": facts.funds_held_since.isoformat() if facts.funds_held_since else None,
         "evidence_closing_date": facts.evidence_closing_date.isoformat() if facts.evidence_closing_date else None,
@@ -94,6 +95,7 @@ def interview() -> HTMLResponse:
 <form method=\"post\" action=\"/case\">
 {_input("course_months", facts.course_months, "Course length (months)", "number")}
 {_input("outstanding_course_fees_gbp", facts.outstanding_course_fees_gbp, "Outstanding course fees (£)", "number")}
+{_input("sponsor_accommodation_paid_gbp", facts.sponsor_accommodation_paid_gbp, "Accommodation paid to your student sponsor (£, maximum offset £1,529)", "number")}
 {_input("bank_balance_gbp", facts.bank_balance_gbp, "Available balance (£)", "number")}
 {_input("funds_held_since", facts.funds_held_since, "Funds held at or above required amount since", "date")}
 {_input("evidence_closing_date", facts.evidence_closing_date, "Most recent evidence closing date", "date")}
@@ -108,13 +110,14 @@ def interview() -> HTMLResponse:
 
 @app.post("/case")
 def save_case(
-    course_months: str = Form(""), outstanding_course_fees_gbp: str = Form(""), bank_balance_gbp: str = Form(""),
+    course_months: str = Form(""), outstanding_course_fees_gbp: str = Form(""), sponsor_accommodation_paid_gbp: str = Form(""), bank_balance_gbp: str = Form(""),
     funds_held_since: str = Form(""), evidence_closing_date: str = Form(""), months_in_uk_with_permission: str = Form(""),
     study_in_london: str = Form(""), applying_permission_to_stay: bool = Form(False),
 ) -> RedirectResponse:
     raw = {
         "course_months": _integer_or_none(course_months, "Course length"),
         "outstanding_course_fees_gbp": _integer_or_none(outstanding_course_fees_gbp, "Outstanding course fees"),
+        "sponsor_accommodation_paid_gbp": _integer_or_none(sponsor_accommodation_paid_gbp, "Accommodation payment"),
         "bank_balance_gbp": _integer_or_none(bank_balance_gbp, "Available balance"),
         "funds_held_since": _date_or_none(funds_held_since, "Funds-held date"),
         "evidence_closing_date": _date_or_none(evidence_closing_date, "Evidence closing date"),
@@ -146,5 +149,5 @@ def dossier() -> HTMLResponse:
         end = result.latest_apply_date.isoformat() if result.latest_apply_date else "confirm with new evidence"
         window = f"{result.earliest_apply_date.isoformat()} to {end}"
     rows = "".join(f'<tr><td><a href="{html.escape(node.source_url)}">{html.escape(node.citation)}</a></td><td class="status">{html.escape(node.status)}</td><td>{html.escape(node.explanation)}</td></tr>' for node in result.nodes)
-    body = f"""<section><h1>Your financial-requirement dossier</h1><p class=\"warning\">This is evidence assembly and gap-checking, not legal advice. Confirm the cited rules and your evidence before applying.</p><h2>Apply-date window</h2><p class=\"note\"><strong>{html.escape(window)}</strong></p><h2>Funds calculation</h2><p>{'£' + format(result.required_funds_gbp, ',') if result.required_funds_gbp is not None else 'Awaiting course or location details.'}</p><h2>Morning briefing</h2><p>{html.escape(briefing['summary'])}</p><h2>Cited requirements</h2><table><thead><tr><th>Rule</th><th>Status</th><th>Assessment</th></tr></thead><tbody>{rows}</tbody></table><p>Rule graph review status: <strong>{html.escape(graph.review_status)}</strong>. {html.escape(graph.review_note)}</p></section>"""
+    body = f"""<section><h1>Your financial-requirement dossier</h1><p class=\"warning\">This is evidence assembly and gap-checking, not legal advice. It currently assesses the cash-evidence route, not student loans or official sponsorship. Confirm the cited rules and your evidence before applying.</p><h2>Apply-date window</h2><p class=\"note\"><strong>{html.escape(window)}</strong></p><h2>Funds calculation</h2><p>{'£' + format(result.required_funds_gbp, ',') if result.required_funds_gbp is not None else 'Awaiting course or location details.'}</p><h2>Morning briefing</h2><p>{html.escape(briefing['summary'])}</p><h2>Cited requirements</h2><table><thead><tr><th>Rule</th><th>Status</th><th>Assessment</th></tr></thead><tbody>{rows}</tbody></table><p>Rule graph review status: <strong>{html.escape(graph.review_status)}</strong>. {html.escape(graph.review_note)}</p></section>"""
     return _layout("Dossier", body)

@@ -1,6 +1,6 @@
 # Dossier
 
-Dossier is a case-preparation assistant for the financial-requirement portion of a UK Student visa application. It turns a small set of confirmed case facts into a cited, deterministic assessment and makes uncertainty visible for human review.
+Dossier is a case-preparation assistant for the cash-evidence financial-requirement portion of a UK Student visa application. It turns a small set of confirmed case facts into a cited, deterministic assessment and makes uncertainty visible for human review.
 
 It is not legal advice and does not submit an application or make an immigration decision.
 
@@ -8,10 +8,13 @@ It is not legal advice and does not submit an application or make an immigration
 
 - A versioned rule graph for the relevant Student and Finance Rules paragraphs.
 - A pure-Python assessment engine for maintenance funds, the 28-day holding period, evidence recency, and the limited in-country exemption.
+- The ST 12.4 sponsor-accommodation offset, capped at £1,529.
 - A structured interview and correction-ready case notebook.
 - Boundary tests for the financial rules and a guard that keeps the decision engine independent of agent code.
 
 The rule graph is marked `REQUIRES_HUMAN_REVIEW`: sources and values must be checked against the official rules before relying on an assessment.
+
+This version does not assess the distinct student-loan or official-sponsorship routes.
 
 ## Run the tests
 
@@ -47,6 +50,10 @@ data/      local runtime data (not committed)
 
 - [Immigration Rules: Appendix Student](https://www.gov.uk/guidance/immigration-rules/appendix-student)
 - [Immigration Rules: Appendix Finance](https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-finance)
+
+The [guidance audit](docs/GUIDANCE_AUDIT.md) recorded four current and two
+outdated public guidance pages on 24 August 2026. It reports the aggregate
+result only; no organisation is named or contacted automatically.
 
 ## Cost guardrail
 
