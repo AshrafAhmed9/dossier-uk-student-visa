@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -138,14 +139,15 @@ def save_preference(question_style: str = Form("clear and direct")) -> RedirectR
 @app.post("/internal/nightly")
 def scheduled_nightly(request: Request) -> JSONResponse:
     """Cloud Scheduler invokes this with an OIDC token; local calls stay simple."""
-    if __import__("os").environ.get("K_SERVICE"):
+    if os.environ.get("K_SERVICE"):
         from google.auth.transport import requests
         from google.oauth2 import id_token
         authorization = request.headers.get("authorization", "")
         if not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Scheduler authentication is required.")
         try:
-            id_token.verify_oauth2_token(authorization.removeprefix("Bearer "), requests.Request(), audience=request.base_url._url.rstrip("/"))
+            audience = os.environ.get("SCHEDULER_AUDIENCE", request.base_url._url.rstrip("/"))
+            id_token.verify_oauth2_token(authorization.removeprefix("Bearer "), requests.Request(), audience=audience)
         except ValueError as exc:
             raise HTTPException(status_code=401, detail="Invalid scheduler identity.") from exc
     return JSONResponse(run())
