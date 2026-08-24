@@ -90,8 +90,8 @@ def assess(graph: RequirementGraph, facts: CaseFacts, as_of: date | None = None)
 
     total = required_funds(facts)
     location_node = "st_12_3_london" if facts.study_in_london else "st_12_3_outside_london"
-    nodes = [_assessment(graph, "st_12_1_exemption", Status.UNSATISFIED,
-                         "The 12-month permission-to-stay exemption is not established for this case.")]
+    nodes = [_assessment(graph, "st_12_1_exemption", Status.NOT_APPLICABLE,
+                         "This case is being assessed under the standard financial requirement; the ST 12.1 exemption does not apply.")]
     if total is None:
         nodes.append(_assessment(graph, location_node, Status.UNKNOWN, "Need study location, course duration, and outstanding course fees."))
     elif facts.bank_balance_gbp is None:
@@ -122,4 +122,9 @@ def assess(graph: RequirementGraph, facts: CaseFacts, as_of: date | None = None)
 
     if total is None or facts.bank_balance_gbp is None or facts.bank_balance_gbp < total:
         earliest = None
+    elif earliest is not None and latest is not None and earliest > latest:
+        # A statement can be too old by the time the 28-day period completes, so
+        # presenting separate dates as an "apply window" would be misleading.
+        earliest = None
+        latest = None
     return Assessment(total, tuple(nodes), earliest, latest)

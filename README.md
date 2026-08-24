@@ -16,8 +16,20 @@ The rule graph is marked `REQUIRES_HUMAN_REVIEW`: sources and values must be che
 ## Run the tests
 
 ```bash
-python3 -m pytest tests/ -v
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m pytest tests/ -v
 ```
+
+## Run locally
+
+```bash
+.venv/bin/uvicorn console.main:app --reload
+```
+
+Open `http://127.0.0.1:8000`. The Interview screen saves only confirmed facts;
+the Dossier screen recalculates the cited result and displays the latest local
+morning briefing. Local case data stays in `data/` and is not committed.
 
 ## Project layout
 
@@ -25,6 +37,8 @@ python3 -m pytest tests/ -v
 rulebook/  cited rule graph and graph loader
 engine/    deterministic financial assessment
 agents/    interview, evidence extraction, and shared case notebook
+jobs/      idempotent nightly recheck and morning briefing
+console/   two-screen FastAPI interface
 tests/     boundary and architecture tests
 data/      local runtime data (not committed)
 ```

@@ -51,6 +51,12 @@ def test_insufficient_balance_is_never_model_judgment():
     assert "£5,539" in node(result, "st_12_3_outside_london").explanation
 
 
+def test_standard_route_can_be_eligible_when_every_financial_node_is_met():
+    result = assess(GRAPH, facts(), TODAY)
+    assert result.eligible_now is True
+    assert node(result, "st_12_1_exemption").status == Status.NOT_APPLICABLE
+
+
 def test_engine_never_imports_agents():
     tree = ast.parse(Path("engine/gaps.py").read_text())
     imported = [alias.name for stmt in ast.walk(tree) if isinstance(stmt, (ast.Import, ast.ImportFrom)) for alias in stmt.names]
