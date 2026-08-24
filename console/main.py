@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from agents.interviewer import choose_next_question
@@ -47,6 +47,27 @@ def _question_style() -> str:
     if not PREFERENCE_PATH.exists():
         return "clear and direct"
     return json.loads(PREFERENCE_PATH.read_text(encoding="utf-8")).get("question_style", "clear and direct")
+
+
+def _integer_or_none(value: str, label: str) -> int | None:
+    if not value:
+        return None
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"{label} must be a whole number.") from exc
+    if parsed < 0:
+        raise HTTPException(status_code=422, detail=f"{label} cannot be negative.")
+    return parsed
+
+
+def _date_or_none(value: str, label: str) -> str | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value).isoformat()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"{label} must be a valid date.") from exc
 
 
 def _input(name: str, value: Any, label: str, kind: str = "text") -> str:
@@ -92,12 +113,12 @@ def save_case(
     study_in_london: str = Form(""), applying_permission_to_stay: bool = Form(False),
 ) -> RedirectResponse:
     raw = {
-        "course_months": int(course_months) if course_months else None,
-        "outstanding_course_fees_gbp": int(outstanding_course_fees_gbp) if outstanding_course_fees_gbp else None,
-        "bank_balance_gbp": int(bank_balance_gbp) if bank_balance_gbp else None,
-        "funds_held_since": funds_held_since or None,
-        "evidence_closing_date": evidence_closing_date or None,
-        "months_in_uk_with_permission": int(months_in_uk_with_permission) if months_in_uk_with_permission else None,
+        "course_months": _integer_or_none(course_months, "Course length"),
+        "outstanding_course_fees_gbp": _integer_or_none(outstanding_course_fees_gbp, "Outstanding course fees"),
+        "bank_balance_gbp": _integer_or_none(bank_balance_gbp, "Available balance"),
+        "funds_held_since": _date_or_none(funds_held_since, "Funds-held date"),
+        "evidence_closing_date": _date_or_none(evidence_closing_date, "Evidence closing date"),
+        "months_in_uk_with_permission": _integer_or_none(months_in_uk_with_permission, "Months in the UK"),
         "study_in_london": {"true": True, "false": False}.get(study_in_london),
         "applying_permission_to_stay": applying_permission_to_stay,
     }
