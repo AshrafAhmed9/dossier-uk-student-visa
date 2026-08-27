@@ -4,3 +4,15 @@ __pycache__/
 *.pyc
 data/*.json
 !data/.gitkeep
+
+# Internal build/filming notes to the AI coding agent or to self — not judge-facing
+HANDOFF.md
+docs/VIDEO_SCRIPT.md
+
+# Agentic-coding tool configs and generated graphs — not part of the submission
+.claude/
+.codex/
+AGENTS.md
+CLAUDE.md
+graphify-out/
+.gitattributes
