@@ -60,14 +60,14 @@ visible rather than asserted.
 - **Leads the interview.** The engine ranks unresolved rule-graph nodes by how much
   each answer would prune, so the highest-information question comes first — not a
   static form marched top to bottom.
-- **Takes real notes.** Every answer becomes a note in the Notebook — `fact` (you
-  told me), `inference` (I derived it, and from what), or `preference` (how you like
-  being asked). Each has a correction control.
-- **Corrections change behavior, not just data.** Correcting an inference re-runs the
-  entire assessment; correcting a preference changes how the next question is asked.
-- **Reads your documents.** A photo of a bank statement or CAS letter is parsed for
-  the fields that matter (holder, closing balance, date range) and shown back to you
-  before it's trusted.
+- **Takes real notes.** Every confirmed answer becomes a note in the Notebook, shown
+  alongside a separate note for how you'd like to be asked questions.
+- **Two kinds of correction, two different effects.** Editing a fact re-runs the
+  entire assessment — the required amount and apply-date window actually recalculate.
+  Editing the question-style preference changes only phrasing; the eligibility result
+  never moves. The notebook data model also supports a third note kind, `inference`
+  (a value the system derived rather than one you confirmed), for a future release —
+  the live console doesn't create or surface these yet.
 - **Works while you're not looking.** A Cloud Scheduler job recomputes every open
   case nightly as the real date moves forward, and writes a morning briefing — the
   autonomy the hackathon's theme asks for, not a button you press.
@@ -147,6 +147,15 @@ Cloud Run runs with a dedicated Firestore-only runtime identity, `min-instances=
 and a maximum of one instance. A ₹800 monthly budget alert is live on the project.
 The deterministic engine and full test suite run free, locally, with no cloud
 dependency at all.
+
+## What's next
+
+- **Wire the multimodal extractor into the console.** `agents/extractor.py` defines
+  the output shape for reading a bank statement or CAS letter image, but the live
+  interview screen has no upload path yet — this is the next feature, not a claimed one.
+- **Surface `inference` notes in the UI**, with a real per-note correction control,
+  so a value the system derives (not just one the user confirms) is visibly
+  correctable the same way a fact is.
 
 ## Live demo notice
 
