@@ -68,6 +68,10 @@ visible rather than asserted.
   never moves. The notebook data model also supports a third note kind, `inference`
   (a value the system derived rather than one you confirmed), for a future release —
   the live console doesn't create or surface these yet.
+- **Reads your bank statement.** Upload a photo of a bank statement and Gemini reads
+  the account holder, institution, closing balance, and closing date off the image —
+  then shows you exactly what it read, editable, before any of it becomes a fact the
+  engine relies on.
 - **Works while you're not looking.** A Cloud Scheduler job recomputes every open
   case nightly as the real date moves forward, and writes a morning briefing — the
   autonomy the hackathon's theme asks for, not a button you press.
@@ -129,6 +133,9 @@ briefing. Local case data stays in `data/` and is never committed.
 - **Async proof**: the nightly job recomputes every open case unattended; a case that
   read "not yet eligible" on one day can read "eligible as of today" the next,
   without anyone touching a button.
+- **Confirmation-first extraction**: uploading a bank statement image never writes a
+  fact directly — `/evidence/upload` returns an editable confirmation screen, and
+  only an explicit `/evidence/confirm` makes the values available to the engine.
 
 ## Rule sources
 
@@ -150,9 +157,6 @@ dependency at all.
 
 ## What's next
 
-- **Wire the multimodal extractor into the console.** `agents/extractor.py` defines
-  the output shape for reading a bank statement or CAS letter image, but the live
-  interview screen has no upload path yet — this is the next feature, not a claimed one.
 - **Surface `inference` notes in the UI**, with a real per-note correction control,
   so a value the system derives (not just one the user confirms) is visibly
   correctable the same way a fact is.
