@@ -12,11 +12,12 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from agents.interviewer import choose_next_question
 from agents.notebook import NoteKind, Notebook
+from agents.extractor import ExtractedEvidence, extract
 from engine.gaps import CaseFacts, assess
 from jobs.nightly import briefing_for, facts_from_raw, load_case, run
 from rulebook.graph import load_graph
@@ -25,6 +26,8 @@ from storage import CaseStore
 
 app = FastAPI(title="Dossier")
 store = CaseStore()
+MAX_EVIDENCE_IMAGE_BYTES = 10 * 1024 * 1024
+SUPPORTED_EVIDENCE_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 def _case_dict(facts: CaseFacts) -> dict[str, Any]:
@@ -76,6 +79,16 @@ def _input(name: str, value: Any, label: str, kind: str = "text") -> str:
     return f'<label>{label}<input type="{kind}" name="{name}" value="{rendered}"></label>'
 
 
+def _evidence_dict(evidence: ExtractedEvidence) -> dict[str, Any]:
+    return {
+        "account_holder": evidence.account_holder,
+        "institution": evidence.institution,
+        "closing_balance_gbp": evidence.closing_balance_gbp,
+        "closing_date": evidence.closing_date.isoformat() if evidence.closing_date else None,
+        "needs_confirmation": True,
+    }
+
+
 def _layout(title: str, body: str) -> HTMLResponse:
     return HTMLResponse(f"""<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>{html.escape(title)} · Dossier</title><style>
 body{{font-family:ui-sans-serif,system-ui,sans-serif;max-width:1050px;margin:2rem auto;padding:0 1rem;color:#17201c;background:#f8faf8}}a{{color:#0d5b42}}nav{{display:flex;gap:1rem;border-bottom:1px solid #cdd7d1;padding-bottom:1rem}}main{{margin-top:2rem}}.grid{{display:grid;grid-template-columns:2fr 1fr;gap:1.5rem}}@media(max-width:720px){{.grid{{grid-template-columns:1fr}}}}section,aside{{background:white;border:1px solid #d8e1dc;border-radius:8px;padding:1.25rem}}label{{display:block;margin:.7rem 0;font-weight:600}}input,select{{display:block;width:100%;box-sizing:border-box;margin-top:.25rem;padding:.5rem;border:1px solid #9dacA4;border-radius:4px}}button{{background:#0d5b42;color:white;border:0;border-radius:4px;padding:.65rem 1rem;font-weight:700;cursor:pointer}}.note{{padding:.7rem;border-left:3px solid #0d5b42;background:#edf5f0}}.warning{{padding:.7rem;border-left:3px solid #a56b00;background:#fff8e6}}.status{{text-transform:uppercase;font-size:.8rem;font-weight:700}}table{{width:100%;border-collapse:collapse}}th,td{{text-align:left;padding:.65rem;border-bottom:1px solid #e2e7e4;vertical-align:top}}</style></head><body><nav><strong>Dossier</strong><a href=\"/\">Interview</a><a href=\"/dossier\">Dossier</a></nav><main>{body}</main></body></html>""")
@@ -102,7 +115,8 @@ def interview() -> HTMLResponse:
 {_input("months_in_uk_with_permission", facts.months_in_uk_with_permission, "Months in the UK with permission", "number")}
 <label>Course location<select name=\"study_in_london\"><option value=\"\">Select</option><option value=\"true\" {'selected' if facts.study_in_london else ''}>London</option><option value=\"false\" {'selected' if facts.study_in_london is False else ''}>Outside London</option></select></label>
 <label><input type=\"checkbox\" name=\"applying_permission_to_stay\" {'checked' if facts.applying_permission_to_stay else ''}> I am applying from inside the UK for permission to stay</label>
-<button>Save confirmed facts and recalculate</button></form></section>
+<button>Save confirmed facts and recalculate</button></form>
+<hr><h2>Read bank evidence</h2><p>Upload a bank-statement image to prefill the balance and closing date. Dossier will show its reading for you to edit and confirm before saving anything.</p><form method=\"post\" action=\"/evidence/upload\" enctype=\"multipart/form-data\"><label>Bank-statement image<input type=\"file\" name=\"image\" accept=\"image/jpeg,image/png,image/webp\" required></label><button>Read image</button></form></section>
 <aside><h2>Notebook</h2><p>Facts are marked user-confirmed. Editing a fact reruns the assessment.</p><ul>{''.join(f'<li><strong>{html.escape(note.key)}</strong>: {html.escape(str(note.value))}</li>' for note in notebook.notes.values() if note.kind == NoteKind.FACT) or '<li>No facts recorded.</li>'}</ul>
 <h2>How should Dossier ask?</h2><form method=\"post\" action=\"/preference\"><label>Question style<select name=\"question_style\"><option {'selected' if _question_style() == 'clear and direct' else ''}>clear and direct</option><option {'selected' if _question_style() == 'gentle and reassuring' else ''}>gentle and reassuring</option><option {'selected' if _question_style() == 'brief and checklist-like' else ''}>brief and checklist-like</option></select></label><button>Update preference</button></form><p>Changing this preference changes only phrasing, never the eligibility result.</p></aside></div>"""
     return _layout("Interview", body)
@@ -126,6 +140,64 @@ def save_case(
         "applying_permission_to_stay": applying_permission_to_stay,
     }
     store.save("case", raw)
+    return RedirectResponse("/dossier", status_code=303)
+
+
+@app.post("/evidence/upload", response_class=HTMLResponse)
+async def upload_evidence(image: UploadFile = File(...)) -> HTMLResponse:
+    if image.content_type not in SUPPORTED_EVIDENCE_IMAGE_TYPES:
+        raise HTTPException(status_code=422, detail="Upload a JPEG, PNG, or WebP image.")
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=422, detail="The uploaded image is empty.")
+    if len(image_bytes) > MAX_EVIDENCE_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="The image must be 10 MB or smaller.")
+    try:
+        candidate = extract(image_bytes, image.content_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Evidence extraction is temporarily unavailable. Please try again.") from exc
+
+    pending = _evidence_dict(candidate)
+    store.save("pending_evidence", pending)
+    return _render_evidence_confirmation(pending)
+
+
+def _render_evidence_confirmation(pending: dict[str, Any]) -> HTMLResponse:
+    body = f"""<section><h1>Confirm document reading</h1><p class=\"warning\">This is Dossier's reading of your image, not a saved fact. Check and edit every value before confirming.</p>
+<form method=\"post\" action=\"/evidence/confirm\">
+{_input("account_holder", pending.get("account_holder"), "Account holder")}
+{_input("institution", pending.get("institution"), "Financial institution")}
+{_input("closing_balance_gbp", pending.get("closing_balance_gbp"), "Closing balance (£)", "number")}
+{_input("closing_date", pending.get("closing_date"), "Statement closing date", "date")}
+<button>Confirm and use these facts</button></form><p><a href=\"/\">Cancel without saving</a></p></section>"""
+    return _layout("Confirm evidence", body)
+
+
+@app.post("/evidence/confirm")
+def confirm_evidence(
+    account_holder: str = Form(""), institution: str = Form(""),
+    closing_balance_gbp: str = Form(""), closing_date: str = Form(""),
+) -> RedirectResponse:
+    if not store.load("pending_evidence"):
+        raise HTTPException(status_code=409, detail="There is no extracted evidence waiting for confirmation.")
+    confirmed = {
+        "account_holder": account_holder.strip() or None,
+        "institution": institution.strip() or None,
+        "closing_balance_gbp": _integer_or_none(closing_balance_gbp, "Closing balance"),
+        "closing_date": _date_or_none(closing_date, "Statement closing date"),
+        "confirmed_by_user": True,
+    }
+    # Only this explicit action makes the candidate available to the deterministic engine.
+    case = store.load("case")
+    if confirmed["closing_balance_gbp"] is not None:
+        case["bank_balance_gbp"] = confirmed["closing_balance_gbp"]
+    if confirmed["closing_date"] is not None:
+        case["evidence_closing_date"] = confirmed["closing_date"]
+    store.save("case", case)
+    store.save("confirmed_evidence", confirmed)
+    store.save("pending_evidence", {})
     return RedirectResponse("/dossier", status_code=303)
 
 
