@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import os
 from datetime import date
 from pathlib import Path
@@ -26,6 +27,7 @@ from storage import CaseStore
 
 app = FastAPI(title="Dossier")
 store = CaseStore()
+logger = logging.getLogger(__name__)
 MAX_EVIDENCE_IMAGE_BYTES = 10 * 1024 * 1024
 SUPPORTED_EVIDENCE_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
@@ -157,6 +159,7 @@ async def upload_evidence(image: UploadFile = File(...)) -> HTMLResponse:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("Evidence extraction failed")
         raise HTTPException(status_code=502, detail="Evidence extraction is temporarily unavailable. Please try again.") from exc
 
     pending = _evidence_dict(candidate)
